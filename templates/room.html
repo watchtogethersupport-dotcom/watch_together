@@ -1,0 +1,2211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, interactive-widget=resizes-content">
+<title>Room {{ code }} — Watch Together</title>
+<link rel="manifest" href="/static/manifest.json">
+<link rel="icon" href="/static/icon-192.png">
+<link rel="apple-touch-icon" href="/static/apple-touch-icon.png">
+<meta name="theme-color" content="#000000">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Watch Together">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.5/socket.io.min.js"></script>
+<style>
+  :root {
+    --bg: #000000;
+    --surface: #0A0A0A;
+    --surface-2: #151515;
+    --accent: #6C9BCF;
+    --green: #6FCF97;
+    --violet: #7A6B9E;
+    --text: #F2EFE9;
+    --muted: #8A8A8A;
+    --line: #232323;
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    height: 100%;
+    height: var(--app-height, 100%);
+    margin: 0;
+    overflow: hidden;
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    transition: height 0.2s ease;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Inter', sans-serif;
+    display: flex;
+    flex-direction: column;
+  }
+
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 22px;
+    border-bottom: 1px solid var(--line);
+    background: var(--surface);
+    flex-wrap: wrap;
+    gap: 10px;
+    flex-shrink: 0;
+    transition: padding 0.2s;
+  }
+
+  .connection-banner {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    background: #4a2e0a;
+    color: #f0b656;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 7px;
+    flex-shrink: 0;
+  }
+  .connection-banner .dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: #f0b656;
+    animation: pulseDot 1s infinite ease-in-out;
+  }
+  @keyframes pulseDot {
+    0%, 100% { opacity: 0.3; }
+    50% { opacity: 1; }
+  }
+
+  body.cinema-active header {
+    padding: 8px 16px;
+    justify-content: flex-end;
+  }
+
+  body.cinema-active .logo {
+    display: none;
+  }
+
+  .logo {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 22px;
+    letter-spacing: 1.5px;
+  }
+  .logo span { color: var(--accent); }
+
+  .ticket {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: var(--surface-2);
+    border: 1px dashed var(--accent);
+    border-radius: 8px;
+    padding: 6px 14px;
+  }
+
+  .ticket .label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--muted);
+  }
+
+  .ticket .code {
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 700;
+    font-size: 18px;
+    letter-spacing: 3px;
+    color: var(--accent);
+  }
+
+  .ticket button {
+    background: none;
+    border: 1px solid var(--line);
+    color: var(--text);
+    border-radius: 6px;
+    padding: 5px 10px;
+    font-size: 12px;
+    cursor: pointer;
+  }
+  .ticket button:hover { border-color: var(--accent); }
+
+  .header-right {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    position: relative;
+  }
+
+  #toggle-controls-btn {
+    background: var(--surface-2);
+    border: 1px solid var(--line);
+    color: var(--text);
+    border-radius: 8px;
+    padding: 8px 10px;
+    cursor: pointer;
+    font-size: 15px;
+    line-height: 1;
+  }
+  #toggle-controls-btn:hover { border-color: var(--accent); }
+
+  #exit-btn {
+    background: transparent;
+    border: 1px solid #6b2a2a;
+    color: #e88;
+    border-radius: 8px;
+    padding: 8px 14px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 600;
+  }
+  #exit-btn:hover { background: rgba(220,80,80,0.12); }
+
+  #voice-btn {
+    background: var(--surface-2);
+    border: 1px solid var(--line);
+    color: var(--text);
+    border-radius: 8px;
+    padding: 8px 14px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 600;
+    user-select: none;
+    transition: background 0.15s, border-color 0.15s, transform 0.1s;
+  }
+  #voice-btn:hover { border-color: var(--accent); }
+  #voice-btn.enabled {
+    background: var(--green);
+    color: #06210f;
+    border-color: var(--green);
+  }
+
+  #speaker-btn {
+    background: var(--surface-2);
+    border: 1px solid var(--line);
+    color: var(--text);
+    border-radius: 8px;
+    padding: 8px 12px;
+    cursor: pointer;
+    font-size: 15px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.15s, border-color 0.15s;
+  }
+  #speaker-btn:hover { border-color: var(--accent); }
+  #speaker-btn.enabled { border-color: var(--accent); background: var(--accent-dim, var(--surface-2)); }
+
+  #panel-toggle-btn {
+    background: var(--surface-2);
+    border: 1px solid var(--line);
+    color: var(--text);
+    border-radius: 8px;
+    padding: 8px 12px;
+    cursor: pointer;
+    font-size: 16px;
+    line-height: 1;
+    transition: background 0.15s, border-color 0.15s;
+  }
+  #panel-toggle-btn:hover { border-color: var(--accent); }
+  #panel-toggle-btn.open { border-color: var(--accent); background: var(--accent-dim, var(--surface-2)); }
+
+  .controls-flyout {
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    width: 260px;
+    max-width: calc(100vw - 32px);
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    box-shadow: 0 14px 36px rgba(0,0,0,0.6);
+    z-index: 60;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    transform-origin: top right;
+    transform: translateY(-10px) scale(0.96);
+    opacity: 0;
+    pointer-events: none;
+    transition: transform 0.18s ease, opacity 0.18s ease;
+  }
+  .controls-flyout.open {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .flyout-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .flyout-buttons button {
+    flex: 1 1 calc(50% - 4px);
+    white-space: nowrap;
+  }
+
+  .controls-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .main.collapsed .controls-panel {
+    display: none;
+  }
+
+  .layout {
+    display: grid;
+    grid-template-columns: 1fr 320px;
+    gap: 0;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  @media (max-width: 860px) {
+    .layout {
+      display: flex;
+      flex-direction: column;
+      grid-template-columns: none;
+      flex: 1;
+      min-height: 0;
+      overflow: hidden;
+    }
+    .main {
+      flex: 0 0 auto;
+      max-height: none;
+      overflow: visible;
+      padding: 12px;
+      gap: 8px;
+    }
+    .hint {
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+  }
+
+  .main {
+    padding: 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    overflow-y: auto;
+    min-height: 0;
+  }
+
+  .url-bar {
+    display: flex;
+    gap: 8px;
+  }
+
+  .yt-suggestions {
+    display: none;
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    right: 0;
+    background: var(--surface-2);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    max-height: 320px;
+    overflow-y: auto;
+    z-index: 30;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.6);
+  }
+  .yt-suggestions.open { display: block; }
+
+  .yt-suggestion-item {
+    display: flex;
+    gap: 10px;
+    padding: 8px 10px;
+    cursor: pointer;
+    align-items: center;
+    border-bottom: 1px solid var(--line);
+  }
+  .yt-suggestion-item:last-child { border-bottom: none; }
+  .yt-suggestion-item:hover { background: rgba(255,255,255,0.06); }
+
+  .yt-suggestion-item img {
+    width: 64px;
+    height: 48px;
+    object-fit: cover;
+    border-radius: 6px;
+    flex-shrink: 0;
+    background: #000;
+  }
+
+  .yt-suggestion-text {
+    overflow: hidden;
+  }
+
+  .yt-suggestion-title {
+    font-size: 12.5px;
+    line-height: 1.3;
+    color: var(--text);
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .yt-suggestion-channel {
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 2px;
+  }
+
+  .up-next-label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    color: var(--muted);
+    margin-bottom: 8px;
+  }
+
+  .up-next-row {
+    display: flex;
+    gap: 10px;
+    overflow-x: auto;
+    padding-bottom: 4px;
+  }
+
+  .up-next-card {
+    flex: 0 0 auto;
+    width: 160px;
+    cursor: pointer;
+  }
+
+  .up-next-card img {
+    width: 160px;
+    height: 90px;
+    object-fit: cover;
+    border-radius: 8px;
+    background: #000;
+    display: block;
+  }
+
+  .up-next-card .title {
+    font-size: 12px;
+    line-height: 1.3;
+    margin-top: 6px;
+    color: var(--text);
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .up-next-card:hover img { outline: 2px solid var(--accent); }
+
+  .url-bar input {
+    flex: 1;
+    padding: 10px 12px;
+    background: var(--surface-2);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    color: var(--text);
+    font-size: 13px;
+  }
+
+  .url-bar button {
+    padding: 10px 16px;
+    background: var(--accent);
+    border: none;
+    border-radius: 8px;
+    color: #0d1520;
+    font-weight: 700;
+    cursor: pointer;
+    font-size: 13px;
+    white-space: nowrap;
+  }
+
+  #resync-btn, #local-file-btn {
+    background: var(--surface-2);
+    color: var(--text);
+    border: 1px solid var(--line);
+  }
+  #resync-btn:hover, #local-file-btn:hover { border-color: var(--accent); }
+
+  .stage {
+    background: #000;
+    border-radius: 12px;
+    aspect-ratio: 16/9;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    border: 1px solid var(--line);
+    position: relative;
+  }
+
+  #play-overlay-btn {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    background: rgba(0,0,0,0.25);
+    border: 1.5px solid rgba(255,255,255,0.35);
+    backdrop-filter: blur(2px);
+    color: rgba(255,255,255,0.85);
+    font-size: 22px;
+    cursor: pointer;
+    z-index: 10;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    transition: opacity 0.2s, background 0.2s;
+  }
+  #play-overlay-btn:hover { background: rgba(0,0,0,0.4); }
+  #play-overlay-btn.hidden-fade { opacity: 0; pointer-events: none; }
+
+  .seek-btn {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: rgba(0,0,0,0.2);
+    border: 1.5px solid rgba(255,255,255,0.3);
+    backdrop-filter: blur(2px);
+    color: rgba(255,255,255,0.8);
+    font-size: 11px;
+    font-weight: 700;
+    cursor: pointer;
+    z-index: 10;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    transition: opacity 0.2s, background 0.2s;
+  }
+  .seek-btn:hover { background: rgba(0,0,0,0.35); }
+  .seek-btn.hidden-fade { opacity: 0; pointer-events: none; }
+  #seek-back-btn { left: calc(50% - 88px); }
+  #seek-fwd-btn { left: calc(50% + 40px); }
+
+  .dtap-zone {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 40%;
+    z-index: 5;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  #dtap-left { left: 0; }
+  #dtap-right { right: 0; }
+
+  .dtap-flash {
+    background: rgba(0,0,0,0.4);
+    color: rgba(255,255,255,0.9);
+    font-size: 13px;
+    font-weight: 700;
+    padding: 10px 16px;
+    border-radius: 30px;
+    opacity: 0;
+    transition: opacity 0.25s;
+    pointer-events: none;
+  }
+  .dtap-flash.show { opacity: 1; }
+
+  /* Vertical swipe indicators — left = brightness, right = volume.
+     Positioned inside .stage only, so they (and the filter they control)
+     never touch the chat panel or anything outside the video box. */
+  .gesture-indicator {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 46px;
+    height: 140px;
+    background: rgba(0,0,0,0.45);
+    border: 1px solid rgba(255,255,255,0.18);
+    border-radius: 23px;
+    backdrop-filter: blur(3px);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-end;
+    padding: 10px 0;
+    gap: 8px;
+    z-index: 20;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.18s;
+  }
+  .gesture-indicator.show { opacity: 1; }
+  #brightness-indicator { left: 18px; }
+  #volume-indicator { right: 18px; }
+
+  .gesture-icon {
+    font-size: 15px;
+    order: -1;
+  }
+
+  .gesture-bar {
+    width: 5px;
+    flex: 1;
+    background: rgba(255,255,255,0.2);
+    border-radius: 3px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .gesture-bar-fill {
+    position: absolute;
+    left: 0; right: 0; bottom: 0;
+    height: 50%;
+    background: var(--accent);
+    border-radius: 3px;
+    transition: height 0.05s linear;
+  }
+
+  .gesture-value {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: rgba(255,255,255,0.85);
+  }
+
+  .seek-bar-wrap {
+    position: absolute;
+    left: 0; right: 0; bottom: 0;
+    z-index: 15;
+    padding: 24px 14px 10px;
+    background: linear-gradient(to top, rgba(0,0,0,0.65), transparent);
+    display: none;
+    flex-direction: column;
+    gap: 5px;
+    transition: opacity 0.2s;
+  }
+  .seek-bar-wrap.hidden-fade { opacity: 0; pointer-events: none; }
+  .seek-bar-wrap.dragging { opacity: 1 !important; pointer-events: auto; }
+
+  .seek-bar-track {
+    position: relative;
+    height: 4px;
+    border-radius: 3px;
+    background: rgba(255,255,255,0.25);
+    cursor: pointer;
+    touch-action: none;
+  }
+  .seek-bar-wrap.dragging .seek-bar-track { height: 6px; }
+
+  .seek-bar-fill {
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 0%;
+    background: var(--accent);
+    border-radius: 3px;
+    pointer-events: none;
+  }
+
+  .seek-bar-handle {
+    position: absolute;
+    top: 50%;
+    left: 0%;
+    width: 13px;
+    height: 13px;
+    border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 0 3px rgba(0,0,0,0.35);
+    transform: translate(-50%, -50%);
+    transition: transform 0.1s;
+    pointer-events: none;
+  }
+  .seek-bar-wrap.dragging .seek-bar-handle { transform: translate(-50%, -50%) scale(1.3); }
+
+  .seek-bar-time {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: rgba(255,255,255,0.85);
+    text-align: right;
+  }
+
+  .stage video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    background: #000;
+  }
+
+  /* Brightness is applied ONLY to the video/player elements below, never to
+     .stage itself — so the seek bar, buttons and indicators (which sit in
+     .stage but outside these two elements) always stay at full brightness,
+     and the chat panel is completely untouched. */
+  #player, #yt-player {
+    filter: brightness(1);
+    transition: filter 0.05s linear;
+  }
+
+  .empty-stage {
+    text-align: center;
+    color: var(--muted);
+    padding: 24px;
+  }
+  .empty-stage .reel { font-size: 40px; margin-bottom: 8px; }
+
+  .hint {
+    font-size: 12px;
+    color: var(--muted);
+    line-height: 1.6;
+  }
+
+  .chat {
+    background: var(--surface);
+    border-left: 1px solid var(--line);
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    min-height: 0;
+  }
+
+  @media (max-width: 860px) {
+    .chat {
+      border-left: none;
+      border-top: 1px solid var(--line);
+      flex: 1 1 auto;
+      min-height: 0;
+      height: auto;
+    }
+  }
+
+  .chat-head {
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--line);
+    font-weight: 700;
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--muted);
+    display: flex;
+    justify-content: space-between;
+    flex-shrink: 0;
+  }
+
+  .chat-head .count { color: var(--accent); cursor: pointer; user-select: none; }
+
+  .online-wrap {
+    position: relative;
+  }
+
+  .online-dropdown {
+    display: none;
+    position: absolute;
+    top: 22px;
+    right: 0;
+    background: var(--surface-2);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 8px 0;
+    min-width: 150px;
+    z-index: 20;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+    opacity: 0;
+    transform: translateY(-4px);
+    transition: opacity 0.15s ease, transform 0.15s ease;
+  }
+
+  .online-dropdown.open {
+    display: block;
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  .online-dropdown .entry {
+    padding: 6px 14px;
+    font-size: 13px;
+    font-weight: 500;
+    text-transform: none;
+    letter-spacing: normal;
+    white-space: nowrap;
+  }
+
+  .msg-row {
+    position: relative;
+    touch-action: pan-y;
+    animation: msgIn 0.2s ease;
+  }
+
+  @keyframes msgIn {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .msg-row .reply-hint-icon {
+    position: absolute;
+    left: -28px;
+    top: 50%;
+    transform: translateY(-50%);
+    opacity: 0;
+    transition: opacity 0.15s;
+    font-size: 15px;
+  }
+
+  .msg-row.swiping .reply-hint-icon { opacity: 1; }
+
+  .msg-row .msg-bubble {
+    transition: transform 0.15s ease;
+  }
+
+  .msg { font-size: 13.5px; line-height: 1.4; }
+  .msg .name { font-weight: 600; }
+  .msg.system { color: var(--muted); font-style: italic; font-size: 12px; }
+
+  .msg .quoted {
+    border-left: 3px solid var(--accent);
+    background: rgba(255,255,255,0.04);
+    border-radius: 6px;
+    padding: 4px 8px;
+    margin-bottom: 4px;
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .msg .quoted .quoted-name {
+    font-weight: 600;
+    color: var(--accent);
+  }
+  .msg .quoted .quoted-text {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: block;
+    max-width: 100%;
+  }
+
+  .messages {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 14px 16px 14px 34px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .reply-preview {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 8px 12px;
+    background: var(--surface-2);
+    border-top: 1px solid var(--line);
+    flex-shrink: 0;
+    animation: replyIn 0.15s ease;
+  }
+
+  @keyframes replyIn {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .reply-preview-content {
+    border-left: 3px solid var(--accent);
+    padding-left: 8px;
+    overflow: hidden;
+  }
+
+  .reply-preview-name {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--accent);
+  }
+
+  .reply-preview-text {
+    font-size: 12px;
+    color: var(--muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  #reply-cancel-btn {
+    background: none;
+    border: none;
+    color: var(--muted);
+    font-size: 16px;
+    cursor: pointer;
+    flex-shrink: 0;
+    padding: 4px 8px;
+  }
+  #reply-cancel-btn:hover { color: var(--text); }
+
+  .chat-input {
+    display: flex;
+    border-top: 1px solid var(--line);
+    padding: 10px;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+
+  .chat-input input {
+    flex: 1;
+    padding: 10px 12px;
+    background: var(--surface-2);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    color: var(--text);
+    font-size: 13px;
+  }
+
+  .chat-input button {
+    background: var(--violet);
+    border: none;
+    border-radius: 8px;
+    color: var(--text);
+    padding: 0 16px;
+    cursor: pointer;
+    font-weight: 600;
+  }
+</style>
+</head>
+<body>
+
+<header id="top-header">
+  <div class="logo">Watch <span>Together</span></div>
+  <div class="header-right">
+    <button id="panel-toggle-btn" title="Options">☰</button>
+    <div class="controls-flyout" id="controls-flyout">
+      <div class="ticket">
+        <div>
+          <div class="label">Room Code</div>
+          <div class="code" id="room-code">{{ code }}</div>
+        </div>
+        <button id="copy-btn">Copy</button>
+        <button id="share-btn" title="Share invite link">🔗</button>
+      </div>
+      <div class="flyout-buttons">
+        <button id="toggle-controls-btn" title="Change video">⚙ Change Video</button>
+        <button id="voice-btn" title="Click to enable voice chat">🎤 Voice</button>
+        <button id="speaker-btn" style="display:none;" title="Turn on to hear the other person">🔇</button>
+        <button id="exit-btn" title="Leave room">Exit</button>
+      </div>
+    </div>
+  </div>
+</header>
+
+<div id="connection-banner" class="connection-banner" style="display:none;">
+  <span class="dot"></span> Reconnecting…
+</div>
+
+<div class="layout">
+  <div class="main" id="main-panel">
+    <div class="controls-panel" id="controls-panel">
+      <div class="url-bar" style="position: relative;">
+        <div style="position: relative; flex: 1;">
+          <input type="text" id="yt-search-input" placeholder="Search YouTube for a movie or video..." autocomplete="off">
+          <div class="yt-suggestions" id="yt-suggestions"></div>
+        </div>
+        <button id="yt-search-btn">🔍 Search on YouTube</button>
+      </div>
+      <div class="url-bar">
+        <input type="text" id="video-url" placeholder="Paste a YouTube link, Google Drive link, or video URL" autocomplete="off" data-lpignore="true" data-1p-ignore>
+        <button id="load-btn">Load Video</button>
+        <button id="local-file-btn" title="Play a video already saved on this device">📁 Local File</button>
+        <button id="resync-btn" title="Sync everyone to your current position">🔄 Sync</button>
+        <input type="file" id="local-file-input" accept="video/*" style="display:none;">
+      </div>
+      <div class="hint">Tip: YouTube links work best (perfect auto-sync). For Google Drive, share the file as "Anyone with the link" — large files may not load. "Local File" plays a video already saved on your device — everyone needs the same file on their own phone for it to stay in sync. If playback ever falls out of sync, press "🔄 Sync" to bring everyone to your current position.</div>
+      <div id="up-next-panel" style="display:none;">
+        <div class="up-next-label">Up Next</div>
+        <div class="up-next-row" id="up-next-row"></div>
+      </div>
+    </div>
+
+    <div class="stage" id="stage">
+      <div class="empty-stage" id="empty-stage">
+        <div class="reel">🎞️</div>
+        Paste a link above and press "Load Video"
+      </div>
+      <video id="player" style="display:none;" playsinline></video>
+      <div id="yt-player" style="display:none; width:100%; height:100%;"></div>
+      <div class="dtap-zone" id="dtap-left"><div class="dtap-flash" id="dtap-flash-left">⏪ 10</div></div>
+      <div class="dtap-zone" id="dtap-right"><div class="dtap-flash" id="dtap-flash-right">10 ⏩</div></div>
+      <div class="gesture-indicator" id="brightness-indicator">
+        <div class="gesture-icon">☀️</div>
+        <div class="gesture-bar"><div class="gesture-bar-fill" id="brightness-fill"></div></div>
+        <div class="gesture-value" id="brightness-value">100%</div>
+      </div>
+      <div class="gesture-indicator" id="volume-indicator">
+        <div class="gesture-icon">🔊</div>
+        <div class="gesture-bar"><div class="gesture-bar-fill" id="volume-fill"></div></div>
+        <div class="gesture-value" id="volume-value">100%</div>
+      </div>
+      <button id="seek-back-btn" class="seek-btn" style="display:none;" title="Back 10s">⏪ 10</button>
+      <button id="play-overlay-btn" style="display:none;" title="Play/Pause">▶</button>
+      <button id="seek-fwd-btn" class="seek-btn" style="display:none;" title="Forward 10s">10 ⏩</button>
+      <div class="seek-bar-wrap" id="seek-bar-wrap">
+        <div class="seek-bar-track" id="seek-bar-track">
+          <div class="seek-bar-fill" id="seek-bar-fill"></div>
+          <div class="seek-bar-handle" id="seek-bar-handle"></div>
+        </div>
+        <div class="seek-bar-time" id="seek-bar-time">0:00 / 0:00</div>
+      </div>
+    </div>
+    <div class="hint" id="fallback-note" style="display:none; color:var(--accent);">
+      This Google Drive video couldn't be loaded directly — Drive is blocking or restricting this file. Try a YouTube link instead (most reliable), or use "📁 Local File" if everyone has the same video saved on their device.
+    </div>
+  </div>
+
+  <div class="chat">
+    <div class="chat-head">
+      <span>Live Chat</span>
+      <div class="online-wrap">
+        <span class="count" id="user-count">1 online</span>
+        <div class="online-dropdown" id="online-dropdown"></div>
+      </div>
+    </div>
+    <div class="messages" id="messages"></div>
+    <div class="reply-preview" id="reply-preview" style="display:none;">
+      <div class="reply-preview-content">
+        <div class="reply-preview-name" id="reply-preview-name"></div>
+        <div class="reply-preview-text" id="reply-preview-text"></div>
+      </div>
+      <button id="reply-cancel-btn" title="Cancel reply">✕</button>
+    </div>
+    <div class="chat-input">
+      <input type="text" id="chat-text" placeholder="Type a message..." autocomplete="off" autocorrect="off" name="chat-message-text" data-lpignore="true" data-1p-ignore data-form-type="other">
+      <button id="send-btn">Send</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  // The video sits in a fixed-size box at the top (.main is flex: 0 0 auto),
+  // and the chat panel below it absorbs all remaining space (.chat is
+  // flex: 1). So instead of locking the page height, we track the actual
+  // *visible* viewport height (window.visualViewport, which correctly
+  // shrinks when the on-screen keyboard opens) and apply that to the page.
+  // The video's box size never depends on this value, so it stays put —
+  // only the chat panel shrinks, which naturally pushes the message input
+  // up to sit right above the keyboard instead of hiding underneath it.
+  function setAppHeight() {
+    const h = (window.visualViewport ? window.visualViewport.height : window.innerHeight);
+    document.documentElement.style.setProperty('--app-height', h + 'px');
+  }
+  setAppHeight();
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener('resize', setAppHeight);
+    window.visualViewport.addEventListener('scroll', setAppHeight);
+  } else {
+    window.addEventListener('resize', setAppHeight);
+  }
+  window.addEventListener('orientationchange', () => setTimeout(setAppHeight, 200));
+</script>
+<script src="https://www.youtube.com/iframe_api"></script>
+<script>
+  const ROOM = "{{ code }}";
+  const NAME = "{{ name }}";
+  const socket = io();
+
+  // ---- Connection status banner ----
+  const connectionBanner = document.getElementById('connection-banner');
+  socket.on('disconnect', (reason) => {
+    // Deliberate disconnects (exiting, backgrounding the tab) shouldn't
+    // show an alarming banner — only show it for unexpected drops.
+    if (reason === 'io client disconnect') return;
+    connectionBanner.style.display = 'flex';
+  });
+  socket.on('connect', () => {
+    connectionBanner.style.display = 'none';
+  });
+  socket.io.on('reconnect_attempt', () => {
+    connectionBanner.style.display = 'flex';
+  });
+
+  // ---- Screen wake lock (keep the screen on while a video is playing) ----
+  let wakeLock = null;
+
+  async function requestWakeLock() {
+    if (!('wakeLock' in navigator)) return;
+    try {
+      wakeLock = await navigator.wakeLock.request('screen');
+    } catch (err) {
+      // Some browsers refuse this in certain contexts — harmless if it fails.
+    }
+  }
+
+  function releaseWakeLock() {
+    if (wakeLock) {
+      wakeLock.release().catch(() => {});
+      wakeLock = null;
+    }
+  }
+
+  // The OS auto-releases the wake lock when the tab is hidden — re-request
+  // it when coming back if a video is actively playing.
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden && wakeLock === null) {
+      const isPlaying = (activeType === 'youtube' && ytPlayer && ytPlayer.getPlayerState && ytPlayer.getPlayerState() === YT.PlayerState.PLAYING)
+        || (activeType === 'direct' && video && !video.paused);
+      if (isPlaying) requestWakeLock();
+    }
+  });
+
+  const video = document.getElementById('player');
+  const ytContainer = document.getElementById('yt-player');
+  const emptyStage = document.getElementById('empty-stage');
+  const fallbackNote = document.getElementById('fallback-note');
+  const messagesEl = document.getElementById('messages');
+  const userCountEl = document.getElementById('user-count');
+  const mainPanel = document.getElementById('main-panel');
+
+  let suppressEmit = false; // true while we're applying a remote event, so we don't echo it back
+  let activeType = null; // 'youtube' | 'drive' | 'direct'
+  let ytPlayer = null;
+  let ytReady = false;
+  let pendingYtVideo = null; // {id, time, playing} if load() is called before API is ready
+  let ytPollTimer = null;
+  let ytLastKnownTime = 0;
+  socket.on('connect', () => {
+    socket.emit('join', { room: ROOM, name: NAME });
+  });
+
+  // ---- Voice chat (continuous, WebRTC peer-to-peer) ----
+  const voiceBtn = document.getElementById('voice-btn');
+  const speakerBtn = document.getElementById('speaker-btn');
+
+  // Google's STUN server alone often fails to connect two phones on
+  // different mobile carriers (common "long distance friend" scenario) —
+  // adding a free public TURN relay as a fallback significantly improves
+  // real-world connection success when direct P2P isn't possible.
+  const ICE_SERVERS = [
+    { urls: 'stun:stun.l.google.com:19302' },
+    { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },
+    { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' },
+    { urls: 'turn:openrelay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' },
+  ];
+
+  let micStream = null;
+  let voiceEnabled = false;
+  let speakerEnabled = false; // OFF by default — you choose to hear the other person
+  const peerConnections = {}; // socket id -> RTCPeerConnection
+
+  function createVoicePeer(targetSid) {
+    const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
+    if (micStream) {
+      micStream.getTracks().forEach(track => pc.addTrack(track, micStream));
+    }
+    pc.onicecandidate = (e) => {
+      if (e.candidate) {
+        socket.emit('voice_ice_candidate', { target: targetSid, candidate: e.candidate });
+      }
+    };
+    pc.ontrack = (e) => {
+      let audioEl = document.getElementById('voice-audio-' + targetSid);
+      if (!audioEl) {
+        audioEl = document.createElement('audio');
+        audioEl.id = 'voice-audio-' + targetSid;
+        audioEl.autoplay = true;
+        document.body.appendChild(audioEl);
+      }
+      audioEl.srcObject = e.streams[0];
+      audioEl.muted = !speakerEnabled;
+    };
+    pc.oniceconnectionstatechange = () => {
+      if (pc.iceConnectionState === 'failed' && pc.restartIce) {
+        pc.restartIce(); // one retry attempt on a dropped/failed connection
+      }
+    };
+    peerConnections[targetSid] = pc;
+    return pc;
+  }
+
+  function closeVoicePeer(sid) {
+    const pc = peerConnections[sid];
+    if (pc) { pc.close(); delete peerConnections[sid]; }
+    const audioEl = document.getElementById('voice-audio-' + sid);
+    if (audioEl) audioEl.remove();
+  }
+
+  socket.on('voice_peer_joined', async (data) => {
+    if (!voiceEnabled) return; // only connect if I've opted into voice too
+    const pc = createVoicePeer(data.sid);
+    const offer = await pc.createOffer();
+    await pc.setLocalDescription(offer);
+    socket.emit('voice_offer', { target: data.sid, sdp: offer });
+  });
+
+  socket.on('voice_offer', async (data) => {
+    if (!voiceEnabled) return;
+    const pc = createVoicePeer(data.sender);
+    await pc.setRemoteDescription(new RTCSessionDescription(data.sdp));
+    const answer = await pc.createAnswer();
+    await pc.setLocalDescription(answer);
+    socket.emit('voice_answer', { target: data.sender, sdp: answer });
+  });
+
+  socket.on('voice_answer', async (data) => {
+    const pc = peerConnections[data.sender];
+    if (pc) await pc.setRemoteDescription(new RTCSessionDescription(data.sdp));
+  });
+
+  socket.on('voice_ice_candidate', async (data) => {
+    const pc = peerConnections[data.sender];
+    if (pc && data.candidate) {
+      try { await pc.addIceCandidate(new RTCIceCandidate(data.candidate)); } catch (err) {}
+    }
+  });
+
+  socket.on('voice_peer_left', (data) => closeVoicePeer(data.sid));
+
+  async function enableVoice() {
+    try {
+      micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    } catch (err) {
+      alert("Couldn't access the microphone. Check your browser/site permissions.");
+      return false;
+    }
+    // Continuous — mic is live the moment voice chat is turned on, like a
+    // normal call, no need to hold anything down while watching together.
+    voiceEnabled = true;
+    voiceBtn.classList.add('enabled');
+    voiceBtn.title = 'Turn off voice chat';
+    speakerBtn.style.display = 'inline-flex';
+    socket.emit('voice_join', { room: ROOM });
+    return true;
+  }
+
+  function disableVoice() {
+    voiceEnabled = false;
+    if (micStream) { micStream.getTracks().forEach(t => t.stop()); micStream = null; }
+    Object.keys(peerConnections).forEach(closeVoicePeer);
+    voiceBtn.classList.remove('enabled');
+    voiceBtn.title = 'Click to enable voice chat';
+    speakerBtn.style.display = 'none';
+  }
+
+  voiceBtn.addEventListener('click', async () => {
+    if (voiceEnabled) {
+      disableVoice();
+    } else {
+      await enableVoice();
+    }
+  });
+
+  // ---- Speaker: controls whether YOU hear the other person. Off by
+  // default so audio never plays unexpectedly — you turn it on when ready.
+  speakerBtn.addEventListener('click', () => {
+    speakerEnabled = !speakerEnabled;
+    speakerBtn.classList.toggle('enabled', speakerEnabled);
+    speakerBtn.textContent = speakerEnabled ? '🔊' : '🔇';
+    document.querySelectorAll('audio[id^="voice-audio-"]').forEach(el => {
+      el.muted = !speakerEnabled;
+    });
+  });
+
+  // ---- Options flyout: one small toggle up top slides open a card with
+  // the mic/speaker/exit/change-video buttons, instead of cluttering the
+  // header with them the whole time you're watching. ----
+  const panelToggleBtn = document.getElementById('panel-toggle-btn');
+  const controlsFlyout = document.getElementById('controls-flyout');
+
+  panelToggleBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const isOpen = controlsFlyout.classList.toggle('open');
+    panelToggleBtn.classList.toggle('open', isOpen);
+    panelToggleBtn.textContent = isOpen ? '✕' : '☰';
+  });
+
+  controlsFlyout.addEventListener('click', (e) => e.stopPropagation());
+
+  document.addEventListener('click', () => {
+    controlsFlyout.classList.remove('open');
+    panelToggleBtn.classList.remove('open');
+    panelToggleBtn.textContent = '☰';
+  });
+
+  // ---- Cinema mode: hide the URL bar/hint once a video is loaded ----
+  document.getElementById('toggle-controls-btn').addEventListener('click', () => {
+    mainPanel.classList.toggle('collapsed');
+    document.body.classList.toggle('cinema-active', mainPanel.classList.contains('collapsed'));
+  });
+
+  function enterCinemaMode() {
+    mainPanel.classList.add('collapsed');
+    document.body.classList.add('cinema-active');
+  }
+
+  // ---- Exit room ----
+  document.getElementById('exit-btn').addEventListener('click', () => {
+    if (confirm('Leave this room?')) {
+      if (micStream) micStream.getTracks().forEach(t => t.stop());
+      Object.keys(peerConnections).forEach(closeVoicePeer);
+      socket.disconnect();
+      window.location.href = '/';
+    }
+  });
+
+  // ---- Accurate online status ----
+  // A very brief flicker (OS taking a screenshot, a system dialog for a
+  // fraction of a second) shouldn't count — but switching apps, locking
+  // the phone, or going to another tab should show up almost immediately.
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) {
+      // No delay here on purpose: mobile browsers freeze JS execution
+      // almost the instant the app is backgrounded, so a setTimeout
+      // scheduled here would never actually run on a phone. Disconnect
+      // synchronously, right as the event fires.
+      socket.disconnect();
+    } else {
+      if (!socket.connected) socket.connect();
+    }
+  });
+
+  // Extra safety net: some mobile browsers fire 'pagehide' instead of (or
+  // in addition to) 'visibilitychange' when the app is backgrounded/closed.
+  window.addEventListener('pagehide', () => {
+    socket.disconnect();
+  });
+
+  // Also cover the tab/app being closed or navigated away from entirely.
+  window.addEventListener('pagehide', () => {
+    socket.disconnect();
+  });
+
+  // ---- Room code copy ----
+  document.getElementById('copy-btn').addEventListener('click', () => {
+    navigator.clipboard.writeText(ROOM);
+    const btn = document.getElementById('copy-btn');
+    const old = btn.textContent;
+    btn.textContent = 'Copied!';
+    setTimeout(() => btn.textContent = old, 1200);
+  });
+
+  // ---- Share invite link (one tap join for whoever opens it) ----
+  document.getElementById('share-btn').addEventListener('click', async () => {
+    const link = `${window.location.origin}/?join=${ROOM}`;
+    const shareText = `Join me on Watch Together — room ${ROOM}`;
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: 'Watch Together', text: shareText, url: link });
+        return;
+      } catch (err) {
+        return; // user cancelled the share sheet
+      }
+    }
+    navigator.clipboard.writeText(link);
+    const btn = document.getElementById('share-btn');
+    const old = btn.textContent;
+    btn.textContent = '✓';
+    setTimeout(() => btn.textContent = old, 1200);
+  });
+
+  // ---- Load video ----
+  document.getElementById('load-btn').addEventListener('click', () => {
+    const url = document.getElementById('video-url').value.trim();
+    if (!url) return;
+    socket.emit('set_video', { room: ROOM, url: url });
+  });
+
+  // ---- YouTube search: live suggestions ----
+  const ytSearchInput = document.getElementById('yt-search-input');
+  const ytSuggestionsBox = document.getElementById('yt-suggestions');
+  let ytSearchDebounce = null;
+  let ytSearchAbort = null;
+
+  function closeYtSuggestions() {
+    ytSuggestionsBox.classList.remove('open');
+    ytSuggestionsBox.innerHTML = '';
+  }
+
+  function renderYtSuggestions(results) {
+    ytSuggestionsBox.innerHTML = '';
+    if (!results.length) { closeYtSuggestions(); return; }
+    results.forEach(r => {
+      const item = document.createElement('div');
+      item.className = 'yt-suggestion-item';
+
+      const img = document.createElement('img');
+      img.src = r.thumbnail || '';
+      item.appendChild(img);
+
+      const textWrap = document.createElement('div');
+      textWrap.className = 'yt-suggestion-text';
+      const title = document.createElement('div');
+      title.className = 'yt-suggestion-title';
+      title.textContent = r.title;
+      const channel = document.createElement('div');
+      channel.className = 'yt-suggestion-channel';
+      channel.textContent = r.channel;
+      textWrap.appendChild(title);
+      textWrap.appendChild(channel);
+      item.appendChild(textWrap);
+
+      item.addEventListener('click', () => {
+        socket.emit('set_video', { room: ROOM, url: 'https://www.youtube.com/watch?v=' + r.video_id });
+        ytSearchInput.value = '';
+        closeYtSuggestions();
+      });
+
+      ytSuggestionsBox.appendChild(item);
+    });
+    ytSuggestionsBox.classList.add('open');
+  }
+
+  ytSearchInput.addEventListener('input', () => {
+    const q = ytSearchInput.value.trim();
+    clearTimeout(ytSearchDebounce);
+    if (!q) { closeYtSuggestions(); return; }
+    ytSearchDebounce = setTimeout(async () => {
+      try {
+        if (ytSearchAbort) ytSearchAbort.abort();
+        ytSearchAbort = new AbortController();
+        const res = await fetch('/api/youtube_search?q=' + encodeURIComponent(q), { signal: ytSearchAbort.signal });
+        const data = await res.json();
+        renderYtSuggestions(data.results || []);
+      } catch (err) {
+        // ignore aborted/failed requests
+      }
+    }, 350);
+  });
+
+  document.addEventListener('click', (e) => {
+    if (!ytSuggestionsBox.contains(e.target) && e.target !== ytSearchInput) {
+      closeYtSuggestions();
+    }
+  });
+
+  // ---- YouTube search: fallback opens results in a new tab ----
+  // (Used if no results come back — e.g. the free API key isn't set up yet.)
+  function openYoutubeSearch() {
+    const q = ytSearchInput.value.trim();
+    if (!q) return;
+    window.open('https://www.youtube.com/results?search_query=' + encodeURIComponent(q), '_blank');
+  }
+  document.getElementById('yt-search-btn').addEventListener('click', openYoutubeSearch);
+  ytSearchInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !ytSuggestionsBox.classList.contains('open')) openYoutubeSearch();
+  });
+
+  // ---- Local file playback ----
+  // A file picked here only exists on this device — there's no way to send
+  // gigabytes of video to the other person over the network. Play/pause/seek
+  // still sync normally through the socket, so this works great as long as
+  // everyone loads the *same* file from their own device.
+  document.getElementById('local-file-btn').addEventListener('click', () => {
+    document.getElementById('local-file-input').click();
+  });
+
+  document.getElementById('local-file-input').addEventListener('change', (e) => {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    const objectUrl = URL.createObjectURL(file);
+    showDirectVideo(objectUrl);
+    enterCinemaMode();
+    addMessage(null, `${NAME} loaded a local file — everyone needs the same video saved on their own device to stay in sync.`, true);
+  });
+
+  const overlayBtn = document.getElementById('play-overlay-btn');
+  const seekBackBtn = document.getElementById('seek-back-btn');
+  const seekFwdBtn = document.getElementById('seek-fwd-btn');
+  let overlayHideTimer = null;
+
+  function updateOverlayIcon(isPlaying) {
+    overlayBtn.textContent = isPlaying ? '⏸' : '▶';
+    if (isPlaying) {
+      scheduleOverlayFade();
+    } else {
+      clearTimeout(overlayHideTimer);
+      overlayBtn.classList.remove('hidden-fade');
+      seekBackBtn.classList.remove('hidden-fade');
+      seekFwdBtn.classList.remove('hidden-fade');
+      seekBarWrap.classList.remove('hidden-fade');
+    }
+  }
+
+  function scheduleOverlayFade() {
+    clearTimeout(overlayHideTimer);
+    overlayHideTimer = setTimeout(() => {
+      overlayBtn.classList.add('hidden-fade');
+      seekBackBtn.classList.add('hidden-fade');
+      seekFwdBtn.classList.add('hidden-fade');
+      if (!isDraggingSeek) seekBarWrap.classList.add('hidden-fade');
+    }, 1200);
+  }
+
+  function revealOverlayBriefly() {
+    overlayBtn.classList.remove('hidden-fade');
+    seekBackBtn.classList.remove('hidden-fade');
+    seekFwdBtn.classList.remove('hidden-fade');
+    seekBarWrap.classList.remove('hidden-fade');
+    const isPlaying = (activeType === 'youtube' && ytPlayer && ytPlayer.getPlayerState() === YT.PlayerState.PLAYING)
+      || (activeType === 'direct' && !video.paused);
+    if (isPlaying) scheduleOverlayFade();
+  }
+
+  // Tapping anywhere on the video brings the buttons back briefly.
+  document.getElementById('stage').addEventListener('click', (e) => {
+    if (e.target !== overlayBtn && e.target !== seekBackBtn && e.target !== seekFwdBtn && !seekBarWrap.contains(e.target)) revealOverlayBriefly();
+  });
+
+  function seekBy(deltaSeconds) {
+    if (activeType === 'youtube' && ytPlayer) {
+      const t = Math.max(0, ytPlayer.getCurrentTime() + deltaSeconds);
+      ytPlayer.seekTo(t, true);
+      ytLastKnownTime = t;
+      socket.emit('seek', { room: ROOM, time: t });
+    } else if (activeType === 'direct') {
+      video.currentTime = Math.max(0, video.currentTime + deltaSeconds);
+      // The video's own 'seeked' listener picks this up and emits to the room.
+    }
+    revealOverlayBriefly();
+  }
+
+  seekBackBtn.addEventListener('click', () => seekBy(-10));
+  seekFwdBtn.addEventListener('click', () => seekBy(10));
+
+  // ---- Draggable seek bar (scrub to any position, YouTube + direct video) ----
+  const seekBarWrap = document.getElementById('seek-bar-wrap');
+  const seekBarTrack = document.getElementById('seek-bar-track');
+  const seekBarFill = document.getElementById('seek-bar-fill');
+  const seekBarHandle = document.getElementById('seek-bar-handle');
+  const seekBarTimeEl = document.getElementById('seek-bar-time');
+  let isDraggingSeek = false;
+  let dragFraction = 0;
+
+  function formatTime(totalSeconds) {
+    totalSeconds = Math.max(0, Math.floor(totalSeconds || 0));
+    const h = Math.floor(totalSeconds / 3600);
+    const m = Math.floor((totalSeconds % 3600) / 60);
+    const s = totalSeconds % 60;
+    if (h > 0) return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+    return `${m}:${String(s).padStart(2, '0')}`;
+  }
+
+  function getDuration() {
+    if (activeType === 'youtube' && ytPlayer && ytPlayer.getDuration) return ytPlayer.getDuration() || 0;
+    if (activeType === 'direct') return video.duration || 0;
+    return 0;
+  }
+
+  function getPlaybackPosition() {
+    if (activeType === 'youtube' && ytPlayer && ytPlayer.getCurrentTime) return ytPlayer.getCurrentTime() || 0;
+    if (activeType === 'direct') return video.currentTime || 0;
+    return 0;
+  }
+
+  function updateSeekBarUI(fraction, currentSeconds, durationSeconds) {
+    const pct = Math.max(0, Math.min(1, fraction)) * 100;
+    seekBarFill.style.width = pct + '%';
+    seekBarHandle.style.left = pct + '%';
+    seekBarTimeEl.textContent = formatTime(currentSeconds) + ' / ' + formatTime(durationSeconds);
+  }
+
+  function applySeekTo(targetTime) {
+    targetTime = Math.max(0, targetTime);
+    if (activeType === 'youtube' && ytPlayer) {
+      ytPlayer.seekTo(targetTime, true);
+      ytLastKnownTime = targetTime;
+      socket.emit('seek', { room: ROOM, time: targetTime });
+    } else if (activeType === 'direct') {
+      video.currentTime = targetTime;
+      // the video's own 'seeked' listener emits this to the room
+    }
+  }
+
+  function fractionFromPointer(clientX) {
+    const rect = seekBarTrack.getBoundingClientRect();
+    if (!rect.width) return 0;
+    return Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+  }
+
+  seekBarTrack.addEventListener('pointerdown', (e) => {
+    if (!activeType) return;
+    isDraggingSeek = true;
+    seekBarWrap.classList.add('dragging');
+    clearTimeout(overlayHideTimer);
+    overlayBtn.classList.remove('hidden-fade');
+    seekBackBtn.classList.remove('hidden-fade');
+    seekFwdBtn.classList.remove('hidden-fade');
+    seekBarWrap.classList.remove('hidden-fade');
+    try { seekBarTrack.setPointerCapture(e.pointerId); } catch (err) {}
+    dragFraction = fractionFromPointer(e.clientX);
+    updateSeekBarUI(dragFraction, dragFraction * getDuration(), getDuration());
+    e.preventDefault();
+  });
+
+  seekBarTrack.addEventListener('pointermove', (e) => {
+    if (!isDraggingSeek) return;
+    dragFraction = fractionFromPointer(e.clientX);
+    updateSeekBarUI(dragFraction, dragFraction * getDuration(), getDuration());
+  });
+
+  function endSeekDrag() {
+    if (!isDraggingSeek) return;
+    isDraggingSeek = false;
+    seekBarWrap.classList.remove('dragging');
+    applySeekTo(dragFraction * getDuration());
+    const isPlaying = (activeType === 'youtube' && ytPlayer && ytPlayer.getPlayerState && ytPlayer.getPlayerState() === YT.PlayerState.PLAYING)
+      || (activeType === 'direct' && !video.paused);
+    if (isPlaying) scheduleOverlayFade();
+  }
+  seekBarTrack.addEventListener('pointerup', endSeekDrag);
+  seekBarTrack.addEventListener('pointercancel', endSeekDrag);
+
+  // Keep the bar in sync with playback while the user isn't dragging it.
+  function seekBarLoop() {
+    if (!isDraggingSeek && activeType) {
+      const duration = getDuration();
+      const current = getPlaybackPosition();
+      updateSeekBarUI(duration > 0 ? current / duration : 0, current, duration);
+    }
+    requestAnimationFrame(seekBarLoop);
+  }
+  requestAnimationFrame(seekBarLoop);
+
+  // ---- Double-tap to seek (mobile gesture, like YouTube) ----
+  // isSuppressed() lets a vertical swipe (brightness/volume, set up below)
+  // cancel the click that follows it, so a swipe never also triggers a seek.
+  function setupDoubleTap(zoneEl, flashEl, delta, isSuppressed) {
+    let lastTap = 0;
+    function trigger() {
+      seekBy(delta);
+      flashEl.classList.add('show');
+      setTimeout(() => flashEl.classList.remove('show'), 500);
+    }
+    zoneEl.addEventListener('click', () => {
+      if (isSuppressed && isSuppressed()) return;
+      const now = Date.now();
+      if (now - lastTap < 350) {
+        trigger();
+        lastTap = 0;
+      } else {
+        lastTap = now;
+      }
+    });
+  }
+
+  // ---- Brightness (left half) & volume (right half) — vertical swipe,
+  // exactly like the YouTube app. Brightness ONLY ever touches the video
+  // element / YouTube player box (#player, #yt-player, see CSS) — nothing
+  // else on the page is affected, chat included. ----
+  let brightnessLevel = 1;   // 1 = normal. Range enforced in setupVerticalGesture below.
+  let volumeLevel = 1;       // 0..1
+
+  function applyBrightness() {
+    const f = `brightness(${brightnessLevel})`;
+    video.style.filter = f;
+    ytContainer.style.filter = f;
+  }
+
+  function applyVolume() {
+    video.volume = volumeLevel;
+    video.muted = volumeLevel <= 0;
+    if (ytPlayer && ytPlayer.setVolume) {
+      ytPlayer.setVolume(Math.round(volumeLevel * 100));
+      if (volumeLevel <= 0) { if (ytPlayer.mute) ytPlayer.mute(); }
+      else if (ytPlayer.unMute) ytPlayer.unMute();
+    }
+  }
+
+  function setupVerticalGesture(zoneEl, opts) {
+    const { getLevel, setLevel, min, max, indicatorEl, fillEl, valueEl, formatValue } = opts;
+    let startY = 0, startLevel = 0, dragging = false, decided = false, isVertical = false, moved = false;
+    const RANGE_PX = 220; // px of drag to cover the full min..max span
+
+    function render(level) {
+      const pct = Math.max(0, Math.min(1, (level - min) / (max - min))) * 100;
+      fillEl.style.height = pct + '%';
+      valueEl.textContent = formatValue(level);
+      indicatorEl.classList.add('show');
+      clearTimeout(indicatorEl._hideTimer);
+    }
+    function hideSoon() {
+      clearTimeout(indicatorEl._hideTimer);
+      indicatorEl._hideTimer = setTimeout(() => indicatorEl.classList.remove('show'), 550);
+    }
+    function onStart(y) {
+      startY = y;
+      startLevel = getLevel();
+      dragging = true;
+      decided = false;
+      isVertical = false;
+      moved = false;
+    }
+    function onMove(y) {
+      if (!dragging) return;
+      const diff = startY - y; // dragging up = positive = increase
+      if (!decided) {
+        if (Math.abs(diff) > 8) { isVertical = true; decided = true; }
+        else return;
+      }
+      if (!isVertical) return;
+      moved = true;
+      let level = startLevel + (diff / RANGE_PX) * (max - min);
+      level = Math.max(min, Math.min(max, level));
+      setLevel(level);
+      render(level);
+    }
+    function onEnd() {
+      if (!dragging) return;
+      dragging = false;
+      if (moved) {
+        opts.suppressClick();
+        hideSoon();
+      }
+    }
+
+    zoneEl.addEventListener('touchstart', (e) => onStart(e.touches[0].clientY), { passive: true });
+    zoneEl.addEventListener('touchmove', (e) => {
+      onMove(e.touches[0].clientY);
+      if (isVertical) e.preventDefault();
+    }, { passive: false });
+    zoneEl.addEventListener('touchend', onEnd);
+    zoneEl.addEventListener('touchcancel', onEnd);
+
+    // Mouse drag support for desktop testing.
+    zoneEl.addEventListener('mousedown', (e) => onStart(e.clientY));
+    window.addEventListener('mousemove', (e) => onMove(e.clientY));
+    window.addEventListener('mouseup', onEnd);
+  }
+
+  let suppressLeftClick = false, suppressRightClick = false;
+
+  setupVerticalGesture(document.getElementById('dtap-left'), {
+    getLevel: () => brightnessLevel,
+    setLevel: (v) => { brightnessLevel = v; applyBrightness(); },
+    min: 0.3, max: 1.8,
+    indicatorEl: document.getElementById('brightness-indicator'),
+    fillEl: document.getElementById('brightness-fill'),
+    valueEl: document.getElementById('brightness-value'),
+    formatValue: (v) => Math.round(v * 100) + '%',
+    suppressClick: () => { suppressLeftClick = true; setTimeout(() => suppressLeftClick = false, 150); },
+  });
+
+  setupVerticalGesture(document.getElementById('dtap-right'), {
+    getLevel: () => volumeLevel,
+    setLevel: (v) => { volumeLevel = v; applyVolume(); },
+    min: 0, max: 1,
+    indicatorEl: document.getElementById('volume-indicator'),
+    fillEl: document.getElementById('volume-fill'),
+    valueEl: document.getElementById('volume-value'),
+    formatValue: (v) => Math.round(v * 100) + '%',
+    suppressClick: () => { suppressRightClick = true; setTimeout(() => suppressRightClick = false, 150); },
+  });
+
+  setupDoubleTap(document.getElementById('dtap-left'), document.getElementById('dtap-flash-left'), -10, () => suppressLeftClick);
+  setupDoubleTap(document.getElementById('dtap-right'), document.getElementById('dtap-flash-right'), 10, () => suppressRightClick);
+
+  function hideAllPlayers() {
+    emptyStage.style.display = 'none';
+    fallbackNote.style.display = 'none';
+    video.style.display = 'none';
+    ytContainer.style.display = 'none';
+    overlayBtn.style.display = 'none';
+    seekBackBtn.style.display = 'none';
+    seekFwdBtn.style.display = 'none';
+    seekBarWrap.style.display = 'none';
+    document.getElementById('up-next-panel').style.display = 'none';
+    document.getElementById('stage').classList.remove('drive-fallback');
+    if (ytPollTimer) { clearInterval(ytPollTimer); ytPollTimer = null; }
+  }
+
+  // ---- "Up Next" related videos (YouTube only) ----
+  let upNextAbort = null;
+  async function loadUpNext(videoId) {
+    const panel = document.getElementById('up-next-panel');
+    const row = document.getElementById('up-next-row');
+    try {
+      if (upNextAbort) upNextAbort.abort();
+      upNextAbort = new AbortController();
+      const res = await fetch('/api/youtube_related?video_id=' + encodeURIComponent(videoId), { signal: upNextAbort.signal });
+      const data = await res.json();
+      const results = data.results || [];
+      if (!results.length) { panel.style.display = 'none'; return; }
+
+      row.innerHTML = '';
+      results.forEach(r => {
+        const card = document.createElement('div');
+        card.className = 'up-next-card';
+
+        const img = document.createElement('img');
+        img.src = r.thumbnail || '';
+        card.appendChild(img);
+
+        const title = document.createElement('div');
+        title.className = 'title';
+        title.textContent = r.title;
+        card.appendChild(title);
+
+        card.addEventListener('click', () => {
+          socket.emit('set_video', { room: ROOM, url: 'https://www.youtube.com/watch?v=' + r.video_id });
+        });
+
+        row.appendChild(card);
+      });
+      panel.style.display = 'block';
+    } catch (err) {
+      panel.style.display = 'none';
+    }
+  }
+
+  function showDirectVideo(src) {
+    hideAllPlayers();
+    activeType = 'direct';
+    video.style.display = 'block';
+    video.src = src;
+    overlayBtn.style.display = 'flex';
+    overlayBtn.classList.remove('hidden-fade');
+    seekBackBtn.style.display = 'flex';
+    seekFwdBtn.style.display = 'flex';
+    seekBackBtn.classList.remove('hidden-fade');
+    seekFwdBtn.classList.remove('hidden-fade');
+    seekBarWrap.style.display = 'flex';
+    seekBarWrap.classList.remove('hidden-fade');
+    updateOverlayIcon(false);
+  }
+
+  let currentCloudProvider = 'Drive';
+
+  function showCloudError() {
+    hideAllPlayers();
+    activeType = null;
+    emptyStage.style.display = 'block';
+    emptyStage.querySelector('.reel').textContent = '⚠️';
+    emptyStage.lastChild.textContent = `This ${currentCloudProvider} video couldn't be loaded.`;
+    fallbackNote.style.display = 'block';
+  }
+
+  function showYouTube(videoId, startTime, autoplay) {
+    hideAllPlayers();
+    activeType = 'youtube';
+    ytContainer.style.display = 'block';
+    overlayBtn.style.display = 'flex';
+    overlayBtn.classList.remove('hidden-fade');
+    seekBackBtn.style.display = 'flex';
+    seekFwdBtn.style.display = 'flex';
+    seekBackBtn.classList.remove('hidden-fade');
+    seekFwdBtn.classList.remove('hidden-fade');
+    seekBarWrap.style.display = 'flex';
+    seekBarWrap.classList.remove('hidden-fade');
+    updateOverlayIcon(!!autoplay);
+    loadUpNext(videoId);
+
+    if (!ytReady) {
+      pendingYtVideo = { id: videoId, time: startTime || 0, playing: !!autoplay };
+      return;
+    }
+
+    if (ytPlayer) {
+      ytPlayer.loadVideoById({ videoId: videoId, startSeconds: startTime || 0 });
+      if (!autoplay) setTimeout(() => ytPlayer.pauseVideo(), 500);
+      startYtPolling();
+      applyVolume();
+      return;
+    }
+
+    ytPlayer = new YT.Player('yt-player', {
+      videoId: videoId,
+      playerVars: { autoplay: autoplay ? 1 : 0, start: Math.floor(startTime || 0), controls: 0 },
+      events: {
+        onReady: () => { startYtPolling(); applyVolume(); },
+        onStateChange: onYtStateChange,
+      }
+    });
+  }
+
+  // ---- Custom play/pause overlay ----
+  overlayBtn.addEventListener('click', () => {
+    if (activeType === 'youtube' && ytPlayer) {
+      if (ytPlayer.getPlayerState() === YT.PlayerState.PLAYING) {
+        ytPlayer.pauseVideo();
+      } else {
+        ytPlayer.playVideo();
+      }
+    } else if (activeType === 'direct') {
+      if (video.paused) video.play(); else video.pause();
+    }
+  });
+
+  // Called by the YouTube IFrame API script once it has loaded.
+  window.onYouTubeIframeAPIReady = function() {
+    ytReady = true;
+    if (pendingYtVideo) {
+      const v = pendingYtVideo;
+      pendingYtVideo = null;
+      showYouTube(v.id, v.time, v.playing);
+    }
+  };
+
+  function onYtStateChange(e) {
+    if (e.data === YT.PlayerState.PLAYING) { updateOverlayIcon(true); requestWakeLock(); }
+    else if (e.data === YT.PlayerState.PAUSED) { updateOverlayIcon(false); releaseWakeLock(); }
+    if (suppressEmit) return;
+    if (e.data === YT.PlayerState.PLAYING) {
+      socket.emit('play', { room: ROOM, time: ytPlayer.getCurrentTime() });
+    } else if (e.data === YT.PlayerState.PAUSED) {
+      socket.emit('pause', { room: ROOM, time: ytPlayer.getCurrentTime() });
+    }
+  }
+
+  // YouTube's API doesn't emit a dedicated "seek" event, so we poll and
+  // detect large jumps in playback position ourselves.
+  function startYtPolling() {
+    if (ytPollTimer) clearInterval(ytPollTimer);
+    ytLastKnownTime = ytPlayer.getCurrentTime();
+    ytPollTimer = setInterval(() => {
+      if (!ytPlayer || suppressEmit) return;
+      const t = ytPlayer.getCurrentTime();
+      const expected = ytLastKnownTime + 1;
+      if (Math.abs(t - expected) > 1.5) {
+        socket.emit('seek', { room: ROOM, time: t });
+      }
+      ytLastKnownTime = t;
+    }, 1000);
+  }
+
+  // If the direct <video> fails to load (common with restricted/large
+  // Drive files), show a plain error instead of any third-party player.
+  video.addEventListener('error', () => {
+    if (activeType === 'direct' && currentCloudProvider) {
+      showCloudError();
+    }
+  });
+
+  function loadVideo(videoInfo, startTime, playing) {
+    if (!videoInfo) return;
+
+    if (videoInfo.type === 'youtube') {
+      currentCloudProvider = null;
+      showYouTube(videoInfo.video_id, startTime, playing);
+    } else if (videoInfo.type === 'drive') {
+      currentCloudProvider = 'Google Drive';
+      if (videoInfo.video_url) {
+        showDirectVideo(videoInfo.video_url);
+      } else {
+        showCloudError();
+      }
+    } else {
+      currentCloudProvider = null;
+      showDirectVideo(videoInfo.video_url);
+    }
+
+    enterCinemaMode();
+  }
+
+  socket.on('video_set', (data) => {
+    loadVideo(data.video, 0, false);
+  });
+
+  // ---- Initial sync when joining ----
+  socket.on('sync_state', (data) => {
+    if (!data.video) return;
+    suppressEmit = true;
+    loadVideo(data.video, data.time || 0, data.state === 'playing');
+
+    if (data.video.type === 'direct' || data.video.type === 'drive') {
+      const targetTime = data.time || 0;
+      const shouldPlay = data.state === 'playing';
+      const applySeek = () => {
+        video.currentTime = targetTime;
+        if (shouldPlay) video.play().catch(() => {});
+      };
+      if (video.readyState >= 1) {
+        // Metadata already available (duration/seekable known) — safe to seek now.
+        applySeek();
+      } else {
+        // Video hasn't finished loading yet — wait until it's ready to seek,
+        // otherwise the browser silently ignores the currentTime assignment
+        // and new joiners always start from 0:00 instead of the live position.
+        video.addEventListener('loadedmetadata', applySeek, { once: true });
+      }
+    }
+    setTimeout(() => suppressEmit = false, 1200);
+  });
+
+  // ---- Remote playback events ----
+  socket.on('play', (data) => {
+    suppressEmit = true;
+    if (activeType === 'youtube' && ytPlayer) {
+      if (Math.abs(ytPlayer.getCurrentTime() - data.time) > 1) ytPlayer.seekTo(data.time, true);
+      ytPlayer.playVideo();
+    } else if (activeType === 'direct') {
+      if (Math.abs(video.currentTime - data.time) > 0.6) video.currentTime = data.time;
+      video.play().catch(() => {});
+    }
+    setTimeout(() => suppressEmit = false, 500);
+  });
+
+  socket.on('pause', (data) => {
+    suppressEmit = true;
+    if (activeType === 'youtube' && ytPlayer) {
+      ytPlayer.seekTo(data.time, true);
+      ytPlayer.pauseVideo();
+    } else if (activeType === 'direct') {
+      video.currentTime = data.time;
+      video.pause();
+    }
+    setTimeout(() => suppressEmit = false, 500);
+  });
+
+  socket.on('seek', (data) => {
+    suppressEmit = true;
+    if (activeType === 'youtube' && ytPlayer) {
+      ytPlayer.seekTo(data.time, true);
+      ytLastKnownTime = data.time;
+    } else if (activeType === 'direct') {
+      video.currentTime = data.time;
+    }
+    setTimeout(() => suppressEmit = false, 500);
+  });
+
+  socket.on('resync', (data) => {
+    suppressEmit = true;
+    if (activeType === 'youtube' && ytPlayer) {
+      ytPlayer.seekTo(data.time, true);
+      if (data.playing) ytPlayer.playVideo(); else ytPlayer.pauseVideo();
+      ytLastKnownTime = data.time;
+    } else if (activeType === 'direct') {
+      video.currentTime = data.time;
+      if (data.playing) video.play().catch(() => {}); else video.pause();
+    }
+    setTimeout(() => suppressEmit = false, 500);
+  });
+
+  // ---- Manual resync button ----
+  document.getElementById('resync-btn').addEventListener('click', () => {
+    let t = 0, playing = false;
+    if (activeType === 'youtube' && ytPlayer) {
+      t = ytPlayer.getCurrentTime();
+      playing = ytPlayer.getPlayerState() === YT.PlayerState.PLAYING;
+    } else if (activeType === 'direct') {
+      t = video.currentTime;
+      playing = !video.paused;
+    } else {
+      return; // no active player to sync
+    }
+    socket.emit('resync', { room: ROOM, time: t, playing: playing });
+  });
+
+  // ---- Local <video> playback -> emit to room ----
+  video.addEventListener('play', () => {
+    if (activeType === 'direct') { updateOverlayIcon(true); requestWakeLock(); }
+    if (suppressEmit || activeType !== 'direct') return;
+    socket.emit('play', { room: ROOM, time: video.currentTime });
+  });
+
+  video.addEventListener('pause', () => {
+    if (activeType === 'direct') { updateOverlayIcon(false); releaseWakeLock(); }
+    if (suppressEmit || activeType !== 'direct') return;
+    socket.emit('pause', { room: ROOM, time: video.currentTime });
+  });
+
+  video.addEventListener('seeked', () => {
+    if (suppressEmit || activeType !== 'direct') return;
+    socket.emit('seek', { room: ROOM, time: video.currentTime });
+  });
+
+  // ---- Chat ----
+  const userColors = new Map();
+  const colorPalette = ['#6C9BCF', '#6FCF97', '#7A9EE8', '#E87A9E', '#B98CE0'];
+
+  function colorFor(name) {
+    if (!userColors.has(name)) {
+      userColors.set(name, colorPalette[userColors.size % colorPalette.length]);
+    }
+    return userColors.get(name);
+  }
+
+  let replyTarget = null; // { name, text } currently being replied to
+  const replyPreview = document.getElementById('reply-preview');
+  const replyPreviewName = document.getElementById('reply-preview-name');
+  const replyPreviewText = document.getElementById('reply-preview-text');
+  const chatTextInput = document.getElementById('chat-text');
+
+  function setReplyTarget(name, text) {
+    replyTarget = { name, text };
+    replyPreviewName.textContent = name;
+    replyPreviewText.textContent = text;
+    replyPreview.style.display = 'flex';
+    chatTextInput.focus();
+  }
+
+  function clearReplyTarget() {
+    replyTarget = null;
+    replyPreview.style.display = 'none';
+  }
+
+  document.getElementById('reply-cancel-btn').addEventListener('click', clearReplyTarget);
+
+  // Enables a WhatsApp-style swipe gesture on a message bubble: dragging it
+  // sideways past a small threshold sets that message as the reply target.
+  function enableSwipeToReply(rowEl, name, text) {
+    let startX = 0, startY = 0, dx = 0, dragging = false, decided = false, isHorizontal = false;
+    const bubble = rowEl.querySelector('.msg-bubble');
+    const THRESHOLD = 60;
+
+    function onStart(x, y) {
+      startX = x; startY = y; dx = 0; dragging = true; decided = false; isHorizontal = false;
+    }
+    function onMove(x, y) {
+      if (!dragging) return;
+      const diffX = x - startX;
+      const diffY = y - startY;
+      if (!decided) {
+        if (Math.abs(diffX) > 6 || Math.abs(diffY) > 6) {
+          isHorizontal = Math.abs(diffX) > Math.abs(diffY);
+          decided = true;
+        } else {
+          return;
+        }
+      }
+      if (!isHorizontal) return; // let vertical scrolling happen normally
+      dx = Math.max(-90, Math.min(90, diffX));
+      bubble.style.transform = `translateX(${dx}px)`;
+      rowEl.classList.toggle('swiping', Math.abs(dx) > 15);
+    }
+    function onEnd() {
+      if (!dragging) return;
+      dragging = false;
+      bubble.style.transform = '';
+      rowEl.classList.remove('swiping');
+      if (isHorizontal && Math.abs(dx) > THRESHOLD) {
+        setReplyTarget(name, text);
+      }
+      dx = 0;
+    }
+
+    rowEl.addEventListener('touchstart', (e) => {
+      const t = e.touches[0];
+      onStart(t.clientX, t.clientY);
+    }, { passive: true });
+    rowEl.addEventListener('touchmove', (e) => {
+      const t = e.touches[0];
+      onMove(t.clientX, t.clientY);
+    }, { passive: true });
+    rowEl.addEventListener('touchend', onEnd);
+    rowEl.addEventListener('touchcancel', onEnd);
+
+    // Mouse drag support for desktop testing.
+    rowEl.addEventListener('mousedown', (e) => onStart(e.clientX, e.clientY));
+    window.addEventListener('mousemove', (e) => onMove(e.clientX, e.clientY));
+    window.addEventListener('mouseup', onEnd);
+  }
+
+  function addMessage(name, msg, system = false, replyTo = null) {
+    const row = document.createElement('div');
+    row.className = 'msg-row';
+
+    const hintIcon = document.createElement('span');
+    hintIcon.className = 'reply-hint-icon';
+    hintIcon.textContent = '↩';
+    row.appendChild(hintIcon);
+
+    const div = document.createElement('div');
+    div.className = 'msg-bubble';
+
+    if (system) {
+      div.className += ' msg system';
+      div.textContent = msg;
+      row.appendChild(div);
+      messagesEl.appendChild(row);
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+      return;
+    }
+
+    div.className += ' msg';
+
+    if (replyTo && replyTo.text) {
+      const quoted = document.createElement('div');
+      quoted.className = 'quoted';
+      const qName = document.createElement('span');
+      qName.className = 'quoted-name';
+      qName.textContent = replyTo.name || '';
+      const qText = document.createElement('span');
+      qText.className = 'quoted-text';
+      qText.textContent = replyTo.text;
+      quoted.appendChild(qName);
+      quoted.appendChild(document.createElement('br'));
+      quoted.appendChild(qText);
+      div.appendChild(quoted);
+    }
+
+    const color = colorFor(name);
+    const nameSpan = document.createElement('span');
+    nameSpan.className = 'name';
+    nameSpan.style.color = color;
+    nameSpan.textContent = name + ':';
+    div.appendChild(nameSpan);
+    div.appendChild(document.createTextNode(' ' + msg));
+
+    row.appendChild(div);
+    messagesEl.appendChild(row);
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+
+    enableSwipeToReply(row, name, msg);
+  }
+
+  function sendChat() {
+    const input = chatTextInput;
+    const msg = input.value.trim();
+    if (!msg) return;
+    const payload = { room: ROOM, name: NAME, msg: msg };
+    if (replyTarget) payload.reply_to = replyTarget;
+    socket.emit('chat', payload);
+    input.value = '';
+    clearReplyTarget();
+    input.focus(); // keep the keyboard open for the next message
+  }
+
+  const sendBtn = document.getElementById('send-btn');
+  // Tapping the Send button would normally blur the text input first
+  // (closing the keyboard) before the click handler runs. Preventing the
+  // default mousedown/touch behavior keeps focus on the input the whole
+  // time, so the keyboard never dismisses.
+  sendBtn.addEventListener('mousedown', (e) => e.preventDefault());
+  sendBtn.addEventListener('click', sendChat);
+  chatTextInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') sendChat();
+  });
+
+  socket.on('chat', (data) => addMessage(data.name, data.msg, false, data.reply_to || null));
+  socket.on('system_message', (data) => addMessage(null, data.text, true));
+  const onlineDropdown = document.getElementById('online-dropdown');
+
+  socket.on('user_list', (data) => {
+    userCountEl.textContent = `${data.users.length} online`;
+    onlineDropdown.innerHTML = '';
+    data.users.forEach(name => {
+      const entry = document.createElement('div');
+      entry.className = 'entry';
+      entry.textContent = name;
+      entry.style.color = colorFor(name);
+      onlineDropdown.appendChild(entry);
+    });
+  });
+
+  userCountEl.addEventListener('click', (e) => {
+    e.stopPropagation();
+    onlineDropdown.classList.toggle('open');
+  });
+
+  document.addEventListener('click', () => {
+    onlineDropdown.classList.remove('open');
+  });
+</script>
+
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/static/sw.js');
+    }
+  </script>
+</body>
+</html>
